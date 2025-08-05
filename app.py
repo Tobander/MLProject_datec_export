@@ -42,6 +42,13 @@ EXTRACTION_SCHEMA = {
 }
 
 # ---------------- STREAMLIT APP ----------------
+
+# LAYOUT
+st.set_page_config(
+    page_title="BDP App",
+    page_icon="📲"
+)
+
 st.title("📄 DATEC Export")
 
 # Dateiupload
@@ -82,30 +89,34 @@ if "extracted_data" in st.session_state:
 
     for i, row in enumerate(extracted_data.get("chargeDetails", [])):
         st.markdown(f"### Position {i + 1}")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            betrag = st.number_input(f"Betrag {i + 1}", value=float(row.get("betrag", 0.0)), step=0.01, key=f"betrag_{i}")
-        with col2:
-            steuersatz = st.selectbox(f"Steuersatz {i + 1}", options=[0, 7, 19], index=[0, 7, 19].index(int(row.get("taxes", 0))), key=f"steuersatz_{i}")
-
-        steuerkennzeichen = st.selectbox(f"Steuerkennzeichen {i + 1}", options=["V0", "V1", "V2"], key=f"steuerkennz_{i}")
+    
+        # Zeile 1: Betrag, Steuersatz, Steuerkennzeichen
+        col1, col2, col3 = st.columns(3)
+        betrag = col1.number_input(f"Betrag {i + 1}", value=float(row.get("betrag", 0.0)), step=0.01, key=f"betrag_{i}")
+        steuersatz = col2.selectbox(f"Steuersatz {i + 1}", options=[0, 7, 19], index=[0, 7, 19].index(int(row.get("taxes", 0))), key=f"steuersatz_{i}")
+        steuerkennzeichen = col3.selectbox(f"Steuerkennzeichen {i + 1}", options=["V0", "V1", "V2"], key=f"steuerkennz_{i}")
+    
+        # Zeile 2: Buchungstext (volle Breite)
         buchungstext = st.text_input(f"Buchungstext {i + 1}", value=f"Wareneingang {steuersatz}%" if steuersatz > 0 else "Wareneinkauf Netto", key=f"bt_{i}")
-        konto = st.number_input(f"Konto {i + 1}", value=3400, step=1, key=f"konto_{i}")
-        gegenkonto = st.number_input(f"Gegenkonto {i + 1}", value=1200, step=1, key=f"gkto_{i}")
-        buchungsart = st.number_input(f"Buchungsart {i + 1}", value=1, step=1, key=f"btyp_{i}")
-        waehrung = st.text_input(f"Währung {i + 1}", value="EUR", key=f"waehrung_{i}")
+    
+        # Zeile 3: Konto, Gegenkonto, Buchungsart, Währung
+        col4, col5, col6, col7 = st.columns(4)
+        konto = col4.selectbox(f"Konto {i + 1}", options=[3400, 4000, 4400], index=0, key=f"konto_{i}")
+        gegenkonto = col5.selectbox(f"Gegenkonto {i + 1}", options=[1200, 1000, 1800], index=0, key=f"gkto_{i}")
+        buchungsart = col6.selectbox(f"Buchungsart {i + 1}", options=[1, 2, 3], index=0, key=f"btyp_{i}")
+        waehrung = col7.text_input(f"Währung {i + 1}", value="EUR", key=f"waehrung_{i}")
 
-        edited_rows.append({
-            "betrag": betrag,
-            "steuersatz": steuersatz,
-            "steuerkennzeichen": steuerkennzeichen,
-            "buchungstext": buchungstext,
-            "konto": konto,
-            "gegenkonto": gegenkonto,
-            "buchungsart": buchungsart,
-            "waehrung": waehrung
-        })
+    # Zusammenbauen
+    edited_rows.append({
+        "betrag": betrag,
+        "steuersatz": steuersatz,
+        "steuerkennzeichen": steuerkennzeichen,
+        "buchungstext": buchungstext,
+        "konto": konto,
+        "gegenkonto": gegenkonto,
+        "buchungsart": buchungsart,
+        "waehrung": waehrung
+    })
 
     # CSV erstellen
     output = io.StringIO()
