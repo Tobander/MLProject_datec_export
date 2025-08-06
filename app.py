@@ -49,7 +49,7 @@ st.set_page_config(
     page_icon="📲"
 )
 
-st.title("📄 DATEC Export")
+st.title("📄 DATAC Export")
 
 # Dateiupload
 uploaded_file = st.file_uploader("Lade eine Rechnung hoch (PDF)", type=["pdf"])
