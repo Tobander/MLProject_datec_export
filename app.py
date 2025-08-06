@@ -12,13 +12,13 @@ VA_API_KEY = os.getenv('VA_API_KEY')
 HEADERS = {"Authorization": f"Basic {VA_API_KEY}"}
 API_URL = "https://api.va.landing.ai/v1/tools/agentic-document-analysis"
 
-# ---------------- JSON-SCHEMA DEFINIEREN ----------------
+# ---------------- NEUES JSON-SCHEMA DEFINIEREN ----------------
 EXTRACTION_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Zoom Invoice Extraction Schema",
+    "title": "Extracted Invoice Information",
     "type": "object",
     "properties": {
-        "invoiceInfo": {
+        "document_info": {
             "type": "object",
             "properties": {
                 "belegdatum": {"type": "string"},
@@ -26,35 +26,28 @@ EXTRACTION_SCHEMA = {
             },
             "required": ["belegdatum", "belegnummer"]
         },
-        "chargeDetails": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "betrag": {"type": "number"},
-                    "taxes": {"type": "number"}
-                },
-                "required": ["betrag", "taxes"]
-            }
+        "summary": {
+            "type": "object",
+            "properties": {
+                "tax_rate": {"type": "string"},
+                "tax_amount": {"type": "number"},
+                "net_total": {"type": "number"},
+                "gross_total": {"type": "number"}
+            },
+            "required": ["tax_rate", "tax_amount", "net_total", "gross_total"]
         }
     },
-    "required": ["invoiceInfo", "chargeDetails"]
+    "required": ["document_info", "summary"]
 }
 
 # ---------------- STREAMLIT APP ----------------
+st.set_page_config(page_title="BDP", page_icon="📄")
+st.title("📄 DATAC Invoice Extraction")
 
-# LAYOUT
-st.set_page_config(
-    page_title="BDP App",
-    page_icon="📲"
-)
-
-st.title("📄 DATAC Export")
-
-# Dateiupload
+# FILE UPLOAD
 uploaded_file = st.file_uploader("Lade eine Rechnung hoch (PDF)", type=["pdf"])
 
-# Daten extrahieren & speichern
+# EXTRACT DATA
 if uploaded_file and "extracted_data" not in st.session_state:
     with st.spinner("Extrahiere Daten mit Landing AI..."):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -71,100 +64,58 @@ if uploaded_file and "extracted_data" not in st.session_state:
 
         st.session_state["extracted_data"] = response.json()["data"]["extracted_schema"]
 
-# Hauptlogik
+# FIELDS
 if "extracted_data" in st.session_state:
     extracted_data = st.session_state["extracted_data"]
-    st.success("Daten erfolgreich extrahiert!")
+    st.success("✅ Daten erfolgreich extrahiert!")
 
-    st.subheader("🧾 Allgemeine Rechnungsdaten")
-    invoice_info = extracted_data.get("invoiceInfo", {})
-    belegdatum = st.text_input("Belegdatum", value=invoice_info.get("belegdatum", ""))
-    belegnummer = st.text_input("Belegnummer", value=invoice_info.get("belegnummer", ""))
-
-    st.subheader("📅 Buchungsdatum")
+    st.subheader("🧾 Rechnungs Informationen")
+    
+    # BUCHUNGSDATUM
     buchungsdatum = st.date_input("Buchungsdatum", value=date.today())
-
-    st.subheader("💰 Rechnungspositionen bearbeiten")
-    edited_rows = []
-
-    for i, row in enumerate(extracted_data.get("chargeDetails", [])):
-        st.markdown(f"### Position {i + 1}")
     
-        # Zeile 1: Betrag, Steuersatz, Steuerkennzeichen
-        col1, col2, col3 = st.columns(3)
-        betrag = col1.number_input(f"Betrag {i + 1}", value=float(row.get("betrag", 0.0)), step=0.01, key=f"betrag_{i}")
-        
-        # STEUERSATZ
-        tax_raw = row.get("taxes", 0)
-        try:
-            tax_value = int(round(float(tax_raw)))
-        except:
-            tax_value = 0
-        
-        if tax_value not in [0, 7, 19]:
-            tax_value = 0
-        
-        steuersatz = col2.selectbox(
-            f"Steuersatz {i + 1}",
-            options=[0, 7, 19],
-            index=[0, 7, 19].index(tax_value),
-            key=f"steuersatz_{i}"
-        )
-        
-        steuerkennzeichen = col3.selectbox(f"Steuerkennzeichen {i + 1}", options=["V0", "V1", "V2"], key=f"steuerkennz_{i}")
-    
-        # Zeile 2: Buchungstext (volle Breite)
-        buchungstext = st.text_input(f"Buchungstext {i + 1}", value=f"Wareneingang {steuersatz}%" if steuersatz > 0 else "Wareneinkauf Netto", key=f"bt_{i}")
-    
-        # Zeile 3: Konto, Gegenkonto, Buchungsart, Währung
-        col4, col5, col6, col7 = st.columns(4)
-        konto = col4.selectbox(f"Konto {i + 1}", options=[3400, 4000, 4400], index=0, key=f"konto_{i}")
-        gegenkonto = col5.selectbox(f"Gegenkonto {i + 1}", options=[1200, 1000, 1800], index=0, key=f"gkto_{i}")
-        buchungsart = col6.selectbox(f"Buchungsart {i + 1}", options=[1, 2, 3], index=0, key=f"btyp_{i}")
-        waehrung = col7.text_input(f"Währung {i + 1}", value="EUR", key=f"waehrung_{i}")
+    # BELEGDATUM & BELEGNUMMER
+    doc_info = extracted_data.get("document_info", {})
+    belegdatum = st.text_input("Belegdatum", value=doc_info.get("belegdatum", ""))
+    belegnummer = st.text_input("Belegnummer", value=doc_info.get("belegnummer", ""))
 
-    # Zusammenbauen
-    edited_rows.append({
-        "betrag": betrag,
-        "steuersatz": steuersatz,
-        "steuerkennzeichen": steuerkennzeichen,
-        "buchungstext": buchungstext,
-        "konto": konto,
-        "gegenkonto": gegenkonto,
-        "buchungsart": buchungsart,
-        "waehrung": waehrung
-    })
+    summary = extracted_data.get("summary", {})
+    
+    # STEURSATZ
+    tax_rate = st.text_input("Steuersatz (%)", value=summary.get("tax_rate", ""))
+    
+    # NWST
+    tax_amount = st.number_input("MWST.", value=summary.get("tax_amount", 0.0), step=0.01)
+    
+    # NETTOBETRAG
+    net_total = st.number_input("Nettobetrag", value=summary.get("net_total", 0.0), step=0.01)
+    gross_total = st.number_input("Bruttobetrag", value=summary.get("gross_total", 0.0), step=0.01)
 
-    # CSV erstellen
+    # CSV Export
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "Buchungsdatum", "Belegdatum", "Belegnummer", "Buchungstext",
-        "Konto", "Gegenkonto", "Betrag", "Steuerkennzeichen", "Buchungsart", "Währung"
+        "Buchungsdatum", "Belegdatum", "Belegnummer",
+        "Steuersatz", "Mehrwertsteuer", "Netto", "Brutto"
     ])
-
-    for row in edited_rows:
-        writer.writerow([
-            buchungsdatum.strftime("%Y-%m-%d"),
-            belegdatum,
-            belegnummer,
-            row["buchungstext"],
-            row["konto"],
-            row["gegenkonto"],
-            row["betrag"],
-            row["steuerkennzeichen"],
-            row["buchungsart"],
-            row["waehrung"]
-        ])
+    writer.writerow([
+        buchungsdatum.strftime("%Y-%m-%d"),
+        belegdatum,
+        belegnummer,
+        tax_rate,
+        tax_amount,
+        net_total,
+        gross_total
+    ])
 
     st.download_button(
         label="💾 CSV-Datei herunterladen",
         data=output.getvalue(),
-        file_name=f"buchung_{belegnummer}.csv",
+        file_name=f"rechnung_{belegnummer}.csv",
         mime="text/csv"
     )
 
-    # Optional: Zurücksetzen-Button
+    # Zurücksetzen
     if st.button("🔁 Neue Datei hochladen / Zurücksetzen"):
         st.session_state.clear()
         st.experimental_rerun()
