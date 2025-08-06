@@ -93,7 +93,24 @@ if "extracted_data" in st.session_state:
         # Zeile 1: Betrag, Steuersatz, Steuerkennzeichen
         col1, col2, col3 = st.columns(3)
         betrag = col1.number_input(f"Betrag {i + 1}", value=float(row.get("betrag", 0.0)), step=0.01, key=f"betrag_{i}")
-        steuersatz = col2.selectbox(f"Steuersatz {i + 1}", options=[0, 7, 19], index=[0, 7, 19].index(int(row.get("taxes", 0))), key=f"steuersatz_{i}")
+        
+        # STEUERSATZ
+        tax_raw = row.get("taxes", 0)
+        try:
+            tax_value = int(round(float(tax_raw)))
+        except:
+            tax_value = 0
+        
+        if tax_value not in [0, 7, 19]:
+            tax_value = 0
+        
+        steuersatz = col2.selectbox(
+            f"Steuersatz {i + 1}",
+            options=[0, 7, 19],
+            index=[0, 7, 19].index(tax_value),
+            key=f"steuersatz_{i}"
+        )
+        
         steuerkennzeichen = col3.selectbox(f"Steuerkennzeichen {i + 1}", options=["V0", "V1", "V2"], key=f"steuerkennz_{i}")
     
         # Zeile 2: Buchungstext (volle Breite)
